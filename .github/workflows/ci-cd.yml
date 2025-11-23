@@ -31,6 +31,9 @@ jobs:
   build:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     
     steps:
     - name: Checkout code
@@ -39,21 +42,46 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: Build Docker image
-      run: |
-        docker build -t fastapi-app:${{ github.sha }} .
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Test Docker container
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}/fastapi-app
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+      
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Test Docker container from registry
       run: |
-        docker run -d --name test-container -p 8000:8000 fastapi-app:${{ github.sha }}
+        docker run -d --name test-container -p 8000:8000 ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }}
         sleep 10
         curl -f http://localhost:8000/health || exit 1
         docker stop test-container
         docker rm test-container
         
-    - name: Save Docker image
+    - name: Save Docker image for offline use
       run: |
-        docker save fastapi-app:${{ github.sha }} | gzip > fastapi-app-${{ github.sha }}.tar.gz
+        docker pull ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }}
+        docker save ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }} | gzip > fastapi-app-${{ github.sha }}.tar.gz
         
     - name: Upload Docker image artifact
       uses: actions/upload-artifact@v4
