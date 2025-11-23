@@ -89,3 +89,67 @@ jobs:
         name: fastapi-docker-image-${{ github.sha }}
         path: fastapi-app-${{ github.sha }}.tar.gz
         retention-days: 30
+
+  integration-test:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    services:
+      fastapi-app:
+        image: ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}
+        ports:
+          - 8000:8000
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        options: >-
+          --health-cmd "curl -f http://localhost:8000/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Wait for service to be ready
+      run: |
+        timeout 120s bash -c 'until curl -f http://localhost:8000/health; do sleep 5; done'
+        
+    - name: Run integration tests
+      run: |
+        echo "Testing API endpoints..."
+        
+        # Test root endpoint
+        response=$(curl -s http://localhost:8000/)
+        echo "Root response: $response"
+        if [[ "$response" != *"Hello World"* ]]; then
+          echo "Root endpoint test failed"
+          exit 1
+        fi
+        
+        # Test health endpoint
+        response=$(curl -s http://localhost:8000/health)
+        echo "Health response: $response"
+        if [[ "$response" != *"healthy"* ]]; then
+          echo "Health endpoint test failed"
+          exit 1
+        fi
+        
+        # Test items endpoint
+        response=$(curl -s http://localhost:8000/items/42?q=test)
+        echo "Items response: $response"
+        if [[ "$response" != *"item_id"* ]] || [[ "$response" != *"42"* ]]; then
+          echo "Items endpoint test failed"
+          exit 1
+        fi
+        
+        # Test invalid endpoint (should return 404)
+        status_code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/invalid)
+        echo "Invalid endpoint status: $status_code"
+        if [[ "$status_code" != "404" ]]; then
+          echo "Invalid endpoint test failed"
+          exit 1
+        fi
+        
+        echo "All integration tests passed!"
