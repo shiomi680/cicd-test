@@ -72,7 +72,7 @@ jobs:
         
     - name: Test Docker container from registry
       run: |
-        docker run -d --name test-container -p 8000:8000 ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }}
+        docker run -d --name test-container -p 8000:8000 ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}
         sleep 10
         curl -f http://localhost:8000/health || exit 1
         docker stop test-container
@@ -80,8 +80,8 @@ jobs:
         
     - name: Save Docker image for offline use
       run: |
-        docker pull ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }}
-        docker save ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}-${{ github.sha }} | gzip > fastapi-app-${{ github.sha }}.tar.gz
+        docker pull ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }}
+        docker save ghcr.io/${{ github.repository }}/fastapi-app:${{ github.ref_name }} | gzip > fastapi-app-${{ github.sha }}.tar.gz
         
     - name: Upload Docker image artifact
       uses: actions/upload-artifact@v4
