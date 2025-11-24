@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     steps:
     - name: Checkout code
@@ -30,7 +30,7 @@ jobs:
         
   build:
     needs: test
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
       packages: write
@@ -92,7 +92,7 @@ jobs:
 
   integration-test:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     services:
       fastapi-app:
